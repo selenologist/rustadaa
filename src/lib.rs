@@ -157,15 +157,15 @@ impl Plugin for RustAdaa {
 
 impl ClapPlugin for RustAdaa {
     const CLAP_ID: &'static str = "com.lunarsynth.rustadaa";
-    const CLAP_DESCRIPTION: &'static str = "Rust port of jatinchowdhury18's ADAA plugin";
+    const CLAP_DESCRIPTION: Option<&'static str> = Some("Rust port of jatinchowdhury18's ADAA plugin");
     const CLAP_FEATURES: &'static [ClapFeature] = &[
         ClapFeature::AudioEffect,
         ClapFeature::Stereo,
         ClapFeature::Distortion,
         ClapFeature::Utility,
     ];
-    const CLAP_MANUAL_URL: &'static str = Self::URL;
-    const CLAP_SUPPORT_URL: &'static str = Self::URL;
+    const CLAP_MANUAL_URL: Option<&'static str> = None;
+    const CLAP_SUPPORT_URL: Option<&'static str> = None;
 }
 
 impl Vst3Plugin for RustAdaa {

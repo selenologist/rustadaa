@@ -106,6 +106,8 @@ impl Adaa2 {
 
         let ad2_future = NL::ad2(x_future);
 
+        // This actually doesn't match the paper... it uses the first antiderivative (G1) instead of
+        // the function itself (G0) and the wrong samples are differenced. But it works?
         let d_now =
             if (x_future - self.x_now).abs() <= TOLERANCE {
                 // step too small, use approximation
