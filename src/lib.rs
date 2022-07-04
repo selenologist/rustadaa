@@ -33,6 +33,10 @@ struct RustAdaaParams {
     /// Nonlinearity function
     #[id = "nl_function"]
     pub nl_function: EnumParam<NlFunctionParam>,
+
+    /// Naive Mode
+    #[id = "naive"]
+    pub naive: BoolParam,
 }
 
 #[derive(Enum, PartialEq)]
@@ -46,9 +50,17 @@ enum NlFunctionParam {
 
 impl RustAdaaParams {
     fn new() -> Self {
-        let gain_range = FloatRange::Linear {
-            min: util::db_to_gain(-16.0),
-            max: util::db_to_gain( 16.0)
+        let pre_gain_range = FloatRange::Linear {
+            min: util::db_to_gain(-24.0),
+            max: util::db_to_gain( 24.0)
+        };
+        let main_gain_range = FloatRange::Linear {
+            min: util::db_to_gain(  0.0),
+            max: util::db_to_gain( 36.0)
+        };
+        let post_gain_range = FloatRange::Linear {
+            min: util::db_to_gain(-36.0),
+            max: util::db_to_gain(  6.0)
         };
 
         // Smooth to target logarithmically (there is no zero as we work in volt gain) in 10ms
@@ -58,19 +70,23 @@ impl RustAdaaParams {
         let string_to_db = formatters::s2v_f32_gain_to_db();
 
         Self {
-            pre_gain: FloatParam::new("Pre Gain", 1.0, gain_range)
+            pre_gain: FloatParam::new("Pre Gain", 1.0, pre_gain_range)
                 .with_smoother(smoothing_style)
                 .with_value_to_string(db_to_string.clone())
-                .with_string_to_value(string_to_db.clone()),
-            main_gain: FloatParam::new("Main Gain", 1.0, gain_range)
+                .with_string_to_value(string_to_db.clone())
+                .with_unit(" dB"),
+            main_gain: FloatParam::new("Main Gain", 1.0, main_gain_range)
                 .with_smoother(smoothing_style)
                 .with_value_to_string(db_to_string.clone())
-                .with_string_to_value(string_to_db.clone()),
-            post_gain: FloatParam::new("Post Gain", 1.0, gain_range)
+                .with_string_to_value(string_to_db.clone())
+                .with_unit(" dB"),
+            post_gain: FloatParam::new("Post Gain", 1.0, post_gain_range)
                 .with_smoother(smoothing_style)
                 .with_value_to_string(db_to_string.clone())
-                .with_string_to_value(string_to_db.clone()),
+                .with_string_to_value(string_to_db.clone())
+                .with_unit(" dB"),
             nl_function: EnumParam::new("Function", NlFunctionParam::HardClip),
+            naive: BoolParam::new("Naive", false)
         }
     }
 }
@@ -130,11 +146,14 @@ impl Plugin for RustAdaa {
         buffer: &mut Buffer,
         _aux: &mut AuxiliaryBuffers,
         _context: &mut impl ProcessContext,
-    ) -> ProcessStatus {        
+    ) -> ProcessStatus {
+        use adaa::NonlinearFunction;
         // until I remember how to use traits properly
-        let shaper = match self.params.nl_function.value() {
-            NlFunctionParam::HardClip => |adaa: &mut adaa::Adaa2, x| adaa.process::<adaa::HardClip>(x),
-            NlFunctionParam::Tanh => |adaa: &mut adaa::Adaa2, x| adaa.process::<adaa::Tanh>(x),
+        let shaper = match (self.params.nl_function.value(), self.params.naive.value) {
+            (NlFunctionParam::HardClip, false) => |adaa: &mut adaa::Adaa2, x| adaa.process::<adaa::HardClip>(x),
+            (NlFunctionParam::Tanh, false) => |adaa: &mut adaa::Adaa2, x| adaa.process::<adaa::Tanh>(x),
+            (NlFunctionParam::HardClip, true) => |_adaa: &mut adaa::Adaa2, x| adaa::HardClip::f(x),
+            (NlFunctionParam::Tanh, true) => |_adaa: &mut adaa::Adaa2, x| adaa::Tanh::f(x),
         };
 
         for mut channel_samples in buffer.iter_samples() {
